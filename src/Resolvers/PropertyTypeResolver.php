@@ -11,9 +11,11 @@ use DateInterval;
 use DateTime;
 use DateTimeImmutable;
 use DateTimeInterface;
-use Dedoc\Scramble\Support\Generator\ClassBasedReference;
 use Dedoc\Scramble\Support\Generator\Components;
+use Dedoc\Scramble\Support\Generator\Reference;
+use Dedoc\Scramble\Support\Generator\Schema;
 use Dedoc\Scramble\Support\Generator\Types\ArrayType as OpenApiArrayType;
+use Dedoc\Scramble\Support\Generator\Types\ObjectType as OpenApiObjectType;
 use Dedoc\Scramble\Support\Generator\Types\BooleanType as OpenApiBooleanType;
 use Dedoc\Scramble\Support\Generator\Types\IntegerType as OpenApiIntegerType;
 use Dedoc\Scramble\Support\Generator\Types\NumberType as OpenApiNumberType;
@@ -164,11 +166,28 @@ class PropertyTypeResolver
     /**
      * Создаёт $ref-ссылку на схему Data-класса в components/schemas.
      *
+     * Если схема ещё не зарегистрирована в components — генерирует её
+     * через DataClassSchemaResolver и добавляет. Это гарантирует что
+     * вложенные Data-объекты не создают битых $ref-ссылок.
+     *
      * @param  class-string  $dataClass
      */
     private function resolveDataReference(string $dataClass): OpenApiType
     {
-        return ClassBasedReference::create('schemas', $dataClass, $this->components);
+        $schemaName = class_basename($dataClass);
+
+        if (!$this->components->hasSchema($schemaName)) {
+            // Ставим заглушку чтобы избежать бесконечной рекурсии
+            // при циклических зависимостях (A -> B -> A)
+            $this->components->addSchema($schemaName, Schema::fromType(new OpenApiObjectType()));
+
+            $resolver = new DataClassSchemaResolver($this->components);
+            $schema = $resolver->resolve($dataClass);
+
+            $this->components->addSchema($schemaName, Schema::fromType($schema));
+        }
+
+        return new Reference('schemas', $schemaName, $this->components);
     }
 
     /**
