@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace Skiexx\LaravelDataScramble\Extensions;
 
 use Dedoc\Scramble\Extensions\OperationExtension;
-use Dedoc\Scramble\Support\Generator\ClassBasedReference;
+use Dedoc\Scramble\Support\Generator\Components;
 use Dedoc\Scramble\Support\Generator\Operation;
+use Dedoc\Scramble\Support\Generator\Reference;
 use Dedoc\Scramble\Support\Generator\Response;
 use Dedoc\Scramble\Support\Generator\Schema;
 use Dedoc\Scramble\Support\Generator\Types\ArrayType as OpenApiArrayType;
@@ -18,6 +19,7 @@ use Dedoc\Scramble\Support\Generator\Types\Type as OpenApiType;
 use Dedoc\Scramble\Support\RouteInfo;
 use ReflectionAttribute;
 use Skiexx\LaravelDataScramble\Attributes\ResponseData;
+use Skiexx\LaravelDataScramble\Resolvers\DataClassSchemaResolver;
 
 /**
  * OperationExtension для обработки атрибута #[ResponseData] на методах контроллера.
@@ -31,7 +33,8 @@ class ResponseDataOperationExtension extends OperationExtension
     /**
      * Обрабатывает операцию: ищет #[ResponseData] и подменяет response.
      *
-     * Если атрибут не найден — ничего не делает.
+     * Удаляет все существующие responses, сгенерированные Scramble,
+     * и заменяет их на правильную схему из атрибута.
      */
     public function handle(Operation $operation, RouteInfo $routeInfo): void
     {
@@ -46,19 +49,49 @@ class ResponseDataOperationExtension extends OperationExtension
         }
 
         $responseData = $attributes[0]->newInstance();
-
-        $dataSchema = $this->buildDataSchema($responseData);
-        $responseSchema = $this->buildResponseSchema($responseData, $dataSchema);
-
-        $this->replaceResponse($operation, $responseData->status, $responseSchema);
-    }
-
-    /** Создаёт $ref-ссылку на схему Data-класса в components/schemas. */
-    private function buildDataSchema(ResponseData $responseData): OpenApiType
-    {
         $components = $this->openApiTransformer->getComponents();
 
-        return ClassBasedReference::create('schemas', $responseData->dataClass, $components);
+        $this->ensureSchemaRegistered($responseData->dataClass, $components);
+
+        $dataRef = $this->buildDataReference($responseData->dataClass, $components);
+        $responseSchema = $this->buildResponseSchema($responseData, $dataRef);
+
+        $this->replaceAllResponses($operation, $responseData->status, $responseSchema);
+    }
+
+    /**
+     * Регистрирует схему Data-класса в components/schemas, если её ещё нет.
+     *
+     * Решает проблему битых $ref-ссылок: когда #[ResponseData] используется
+     * с анонимным JsonResource, TypeToSchemaExtension не вызывается,
+     * и схема не попадает в components автоматически.
+     *
+     * @param class-string $dataClass
+     */
+    private function ensureSchemaRegistered(string $dataClass, Components $components): void
+    {
+        $schemaName = class_basename($dataClass);
+
+        if ($components->hasSchema($schemaName)) {
+            return;
+        }
+
+        $resolver = new DataClassSchemaResolver($components);
+        $schema = $resolver->resolve($dataClass);
+
+        $components->addSchema($schemaName, Schema::fromType($schema));
+    }
+
+    /**
+     * Создаёт Reference на схему Data-класса в components/schemas.
+     *
+     * @param class-string $dataClass
+     */
+    private function buildDataReference(string $dataClass, Components $components): Reference
+    {
+        $schemaName = class_basename($dataClass);
+
+        return new Reference('schemas', $schemaName, $components);
     }
 
     /**
@@ -69,9 +102,9 @@ class ResponseDataOperationExtension extends OperationExtension
      * Для paginated: { "data": [...], "meta": {...}, "links": {...} }
      * Для unwrapped: $ref или [$ref] напрямую.
      */
-    private function buildResponseSchema(ResponseData $responseData, OpenApiType $dataSchema): OpenApiType
+    private function buildResponseSchema(ResponseData $responseData, Reference $dataRef): OpenApiType|Reference
     {
-        $itemsSchema = $dataSchema;
+        $itemsSchema = $dataRef;
 
         if ($responseData->isCollection()) {
             $arrayType = new OpenApiArrayType();
@@ -154,24 +187,17 @@ class ResponseDataOperationExtension extends OperationExtension
         return $meta;
     }
 
-    /** Заменяет существующий response с данным status code или добавляет новый. */
-    private function replaceResponse(Operation $operation, int $status, OpenApiType $schema): void
+    /**
+     * Удаляет все существующие responses и ставит единственный с нашей схемой.
+     *
+     * Scramble генерирует мусорный 200 response для анонимного JsonResource.
+     * Мы заменяем все responses на один правильный с нужным status code.
+     */
+    private function replaceAllResponses(Operation $operation, int $status, OpenApiType|Reference $schema): void
     {
         $newResponse = Response::make($status)
             ->setContent('application/json', Schema::fromType($schema));
 
-        $replaced = false;
-        foreach ($operation->responses as $i => $existingResponse) {
-            if ($existingResponse instanceof Response && $existingResponse->code === $status) {
-                $operation->responses[$i] = $newResponse;
-                $replaced = true;
-
-                break;
-            }
-        }
-
-        if (!$replaced) {
-            $operation->addResponse($newResponse);
-        }
+        $operation->responses = [$newResponse];
     }
 }
