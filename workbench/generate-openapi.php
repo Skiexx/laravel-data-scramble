@@ -44,6 +44,9 @@ $testCase = new class ('generate') extends \Orchestra\Testbench\TestCase {
             Route::post('users', [\Workbench\App\Http\Controllers\UserController::class, 'store']);
             Route::put('users/{user}', [\Workbench\App\Http\Controllers\UserController::class, 'update']);
             Route::delete('users/{id}', [\Workbench\App\Http\Controllers\UserController::class, 'destroy']);
+
+            Route::get('products', fn (\Workbench\App\Data\ProductData $filter): \Workbench\App\Data\ProductData => $filter);
+            Route::post('products', fn (\Workbench\App\Data\ProductData $data): \Workbench\App\Data\ProductData => $data);
         });
 
         // Генерируем OpenAPI

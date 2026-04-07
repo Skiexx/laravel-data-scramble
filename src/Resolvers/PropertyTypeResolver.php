@@ -23,6 +23,7 @@ use Dedoc\Scramble\Support\Generator\Types\StringType as OpenApiStringType;
 use Dedoc\Scramble\Support\Generator\Types\Type as OpenApiType;
 use Dedoc\Scramble\Support\Generator\Types\UnknownType as OpenApiUnknownType;
 use ReflectionEnum;
+use Skiexx\LaravelDataScramble\Contracts\OpenApiSchema;
 use Spatie\LaravelData\Contracts\BaseData;
 use Spatie\LaravelData\Support\DataProperty;
 use Spatie\LaravelData\Support\Types\CombinationType;
@@ -103,6 +104,7 @@ class PropertyTypeResolver
             $type->name === DateInterval::class => (new OpenApiStringType())->format('duration'),
             $this->isBackedEnum($type->name) => $this->resolveEnumType($type->name),
             is_subclass_of($type->name, BaseData::class) => $this->resolveDataReference($type->name),
+            $this->implementsOpenApiSchema($type->name) => $this->resolveOpenApiSchema($type->name),
             default => new OpenApiStringType(),
         };
     }
@@ -137,6 +139,51 @@ class PropertyTypeResolver
     private function isBackedEnum(string $className): bool
     {
         return enum_exists($className) && is_subclass_of($className, BackedEnum::class);
+    }
+
+    /** Проверяет, реализует ли класс интерфейс OpenApiSchema. */
+    private function implementsOpenApiSchema(string $className): bool
+    {
+        return class_exists($className)
+            && in_array(OpenApiSchema::class, class_implements($className) ?: []);
+    }
+
+    /**
+     * Преобразует класс с OpenApiSchema в OpenAPI-тип.
+     *
+     * Вызывает openApiSchema() и конвертирует массив в OpenApiType.
+     *
+     * @param  class-string<OpenApiSchema>  $className
+     */
+    private function resolveOpenApiSchema(string $className): OpenApiType
+    {
+        /** @var array<string, mixed> $schema */
+        $schema = $className::openApiSchema();
+
+        $type = $schema['type'] ?? 'string';
+
+        $openApiType = match ($type) {
+            'string' => new OpenApiStringType(),
+            'integer' => new OpenApiIntegerType(),
+            'number' => new OpenApiNumberType(),
+            'boolean' => new OpenApiBooleanType(),
+            'array' => new OpenApiArrayType(),
+            default => new OpenApiStringType(),
+        };
+
+        if (isset($schema['format'])) {
+            $openApiType->format($schema['format']);
+        }
+
+        if (isset($schema['enum']) && is_array($schema['enum'])) {
+            $openApiType->enum($schema['enum']);
+        }
+
+        if (isset($schema['pattern'])) {
+            $openApiType->pattern($schema['pattern']);
+        }
+
+        return $openApiType;
     }
 
     /**
