@@ -1,0 +1,202 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Skiexx\LaravelDataScramble\Resolvers;
+
+use BackedEnum;
+use Carbon\Carbon;
+use Carbon\CarbonImmutable;
+use DateInterval;
+use DateTime;
+use DateTimeImmutable;
+use DateTimeInterface;
+use Dedoc\Scramble\Support\Generator\ClassBasedReference;
+use Dedoc\Scramble\Support\Generator\Components;
+use Dedoc\Scramble\Support\Generator\Types\ArrayType as OpenApiArrayType;
+use Dedoc\Scramble\Support\Generator\Types\BooleanType as OpenApiBooleanType;
+use Dedoc\Scramble\Support\Generator\Types\IntegerType as OpenApiIntegerType;
+use Dedoc\Scramble\Support\Generator\Types\NumberType as OpenApiNumberType;
+use Dedoc\Scramble\Support\Generator\Types\StringType as OpenApiStringType;
+use Dedoc\Scramble\Support\Generator\Types\Type as OpenApiType;
+use Dedoc\Scramble\Support\Generator\Types\UnknownType as OpenApiUnknownType;
+use ReflectionEnum;
+use Spatie\LaravelData\Contracts\BaseData;
+use Spatie\LaravelData\Support\DataProperty;
+use Spatie\LaravelData\Support\Types\CombinationType;
+use Spatie\LaravelData\Support\Types\NamedType;
+
+/**
+ * Преобразует PHP-тип свойства Data-класса в OpenAPI-тип.
+ *
+ * Поддерживает: скалярные типы, даты (Carbon, DateTime), backed enum,
+ * вложенные Data-объекты ($ref), коллекции Data, union-типы с null.
+ */
+class PropertyTypeResolver
+{
+    /** @var class-string[] */
+    private const DATETIME_CLASSES = [
+        Carbon::class,
+        CarbonImmutable::class,
+        DateTime::class,
+        DateTimeImmutable::class,
+        DateTimeInterface::class,
+    ];
+
+    public function __construct(
+        private readonly Components $components,
+    ) {
+    }
+
+    /** Определяет OpenAPI-тип для свойства Data-класса. */
+    public function resolve(DataProperty $property): OpenApiType
+    {
+        $propertyType = $property->type;
+
+        if ($propertyType->isMixed) {
+            return new OpenApiUnknownType();
+        }
+
+        if ($propertyType->kind->isDataObject() && $propertyType->dataClass !== null) {
+            return $this->resolveDataReference($propertyType->dataClass);
+        }
+
+        if ($propertyType->kind->isDataCollectable()) {
+            $itemClass = $propertyType->dataCollectableClass;
+
+            if ($itemClass !== null && class_exists($itemClass)) {
+                $arrayType = new OpenApiArrayType();
+                $arrayType->setItems($this->resolveDataReference($itemClass));
+
+                return $arrayType;
+            }
+
+            return new OpenApiArrayType();
+        }
+
+        $type = $propertyType->type;
+
+        if ($type instanceof NamedType) {
+            return $this->resolveNamedType($type);
+        }
+
+        if ($type instanceof CombinationType) {
+            return $this->resolveCombinationType($type);
+        }
+
+        return new OpenApiUnknownType();
+    }
+
+    /**
+     * Преобразует NamedType (конкретный PHP-тип) в OpenAPI-тип.
+     *
+     * Маршрутизация: built-in → скаляры, DateTime → date-time,
+     * BackedEnum → enum, Data-наследник → $ref.
+     */
+    private function resolveNamedType(NamedType $type): OpenApiType
+    {
+        return match (true) {
+            $type->builtIn => $this->resolveBuiltInType($type->name),
+            $this->isDateTimeType($type->name) => (new OpenApiStringType())->format('date-time'),
+            $type->name === DateInterval::class => (new OpenApiStringType())->format('duration'),
+            $this->isBackedEnum($type->name) => $this->resolveEnumType($type->name),
+            is_subclass_of($type->name, BaseData::class) => $this->resolveDataReference($type->name),
+            default => new OpenApiStringType(),
+        };
+    }
+
+    /** Маппинг встроенных PHP-типов в OpenAPI: string, int, float, bool, array. */
+    private function resolveBuiltInType(string $typeName): OpenApiType
+    {
+        return match ($typeName) {
+            'string' => new OpenApiStringType(),
+            'int' => new OpenApiIntegerType(),
+            'float' => new OpenApiNumberType(),
+            'bool' => new OpenApiBooleanType(),
+            'array' => new OpenApiArrayType(),
+            'null' => (new OpenApiStringType())->nullable(true),
+            default => new OpenApiUnknownType(),
+        };
+    }
+
+    /** Проверяет, является ли класс DateTime-совместимым типом. */
+    private function isDateTimeType(string $className): bool
+    {
+        foreach (self::DATETIME_CLASSES as $dateTimeClass) {
+            if ($className === $dateTimeClass || is_subclass_of($className, $dateTimeClass)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Проверяет, является ли класс backed enum. */
+    private function isBackedEnum(string $className): bool
+    {
+        return enum_exists($className) && is_subclass_of($className, BackedEnum::class);
+    }
+
+    /**
+     * Преобразует backed enum в OpenAPI-тип с перечислением допустимых значений.
+     *
+     * Для string-backed → StringType + enum, для int-backed → IntegerType + enum.
+     *
+     * @param  class-string<BackedEnum>  $enumClass
+     */
+    private function resolveEnumType(string $enumClass): OpenApiType
+    {
+        $reflection = new ReflectionEnum($enumClass);
+        $backingType = $reflection->getBackingType();
+
+        $cases = array_map(
+            fn (BackedEnum $case) => $case->value,
+            $enumClass::cases(),
+        );
+
+        $openApiType = $backingType?->getName() === 'int'
+            ? new OpenApiIntegerType()
+            : new OpenApiStringType();
+
+        return $openApiType->enum($cases);
+    }
+
+    /**
+     * Создаёт $ref-ссылку на схему Data-класса в components/schemas.
+     *
+     * @param  class-string  $dataClass
+     */
+    private function resolveDataReference(string $dataClass): OpenApiType
+    {
+        return ClassBasedReference::create('schemas', $dataClass, $this->components);
+    }
+
+    /**
+     * Обрабатывает union-типы (T|null), извлекая первый не-null тип.
+     *
+     * Nullable определяется на уровне DataPropertyType, поэтому
+     * здесь просто находим основной тип из union.
+     */
+    private function resolveCombinationType(CombinationType $type): OpenApiType
+    {
+        $nonNullTypes = [];
+
+        foreach ($type->types as $subType) {
+            if ($subType instanceof NamedType && $subType->name === 'null') {
+                continue;
+            }
+
+            $nonNullTypes[] = $subType;
+        }
+
+        if (count($nonNullTypes) === 1 && $nonNullTypes[0] instanceof NamedType) {
+            return $this->resolveNamedType($nonNullTypes[0]);
+        }
+
+        if (count($nonNullTypes) > 0 && $nonNullTypes[0] instanceof NamedType) {
+            return $this->resolveNamedType($nonNullTypes[0]);
+        }
+
+        return new OpenApiUnknownType();
+    }
+}
