@@ -42,10 +42,10 @@ composer require skiexx/laravel-data-scramble
 ### Публикация конфигурации (опционально)
 
 ```bash
-php artisan vendor:publish --tag="laravel-data-scramble-config"
+php artisan vendor:publish --tag="skiexx-data-scramble-config"
 ```
 
-Файл конфигурации будет создан в `config/laravel-data-scramble.php`.
+Файл конфигурации будет создан в `config/skiexx-data-scramble.php`.
 
 ## Быстрый старт
 
@@ -127,7 +127,7 @@ CreateUserData:
 ## Конфигурация
 
 ```php
-// config/laravel-data-scramble.php
+// config/skiexx-data-scramble.php
 
 return [
     // Автоматическая регистрация расширения в Scramble.
@@ -1017,7 +1017,7 @@ responses:
 Если вам нужно контролировать момент регистрации или регистрировать расширение только для определенного API:
 
 ```php
-// config/laravel-data-scramble.php
+// config/skiexx-data-scramble.php
 return [
     'auto_register' => false,  // Отключаем авторегистрацию
 ];
@@ -1073,7 +1073,7 @@ class CustomDataExtension extends LaravelDataTypeToSchemaExtension
 Зарегистрируйте своё расширение:
 
 ```php
-// config/laravel-data-scramble.php
+// config/skiexx-data-scramble.php
 return [
     'auto_register' => false,
 ];

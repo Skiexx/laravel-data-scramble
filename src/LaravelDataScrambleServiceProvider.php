@@ -19,7 +19,7 @@ use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
 /**
- * Сервис-провайдер пакета laravel-data-scramble.
+ * Сервис-провайдер пакета skiexx-data-scramble.
  *
  * Регистрирует TypeToSchemaExtension для парсинга Data-классов,
  * DataParametersExtractor для обработки входных параметров контроллеров
@@ -31,7 +31,7 @@ class LaravelDataScrambleServiceProvider extends PackageServiceProvider
     public function configurePackage(Package $package): void
     {
         $package
-            ->name('laravel-data-scramble')
+            ->name('laravel-skiexx-data-scramble')
             ->hasConfigFile();
     }
 
@@ -42,7 +42,7 @@ class LaravelDataScrambleServiceProvider extends PackageServiceProvider
      */
     public function packageBooted(): void
     {
-        if (config('laravel-data-scramble.auto_register', true)) {
+        if (config('skiexx-data-scramble.auto_register', true)) {
             Scramble::registerExtension(LaravelDataTypeToSchemaExtension::class);
 
             Scramble::configure()

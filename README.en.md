@@ -42,10 +42,10 @@ The service provider is registered automatically via Laravel auto-discovery. The
 ### Publishing configuration (optional)
 
 ```bash
-php artisan vendor:publish --tag="laravel-data-scramble-config"
+php artisan vendor:publish --tag="skiexx-data-scramble-config"
 ```
 
-The configuration file will be created at `config/laravel-data-scramble.php`.
+The configuration file will be created at `config/skiexx-data-scramble.php`.
 
 ## Quick start
 
@@ -127,7 +127,7 @@ CreateUserData:
 ## Configuration
 
 ```php
-// config/laravel-data-scramble.php
+// config/skiexx-data-scramble.php
 
 return [
     // Automatic extension registration in Scramble.
@@ -888,7 +888,7 @@ public function show(string $id): JsonResource
 If you need to control the registration moment or register the extension only for a specific API:
 
 ```php
-// config/laravel-data-scramble.php
+// config/skiexx-data-scramble.php
 return [
     'auto_register' => false,
 ];
@@ -940,7 +940,7 @@ class CustomDataExtension extends LaravelDataTypeToSchemaExtension
 Register your extension:
 
 ```php
-// config/laravel-data-scramble.php
+// config/skiexx-data-scramble.php
 return [
     'auto_register' => false,
 ];

@@ -14,14 +14,14 @@ use Illuminate\Support\Str;
  *
  * Решает проблему когда роуты имеют технический префикс (web/, v1/ и т.д.),
  * который не нужен в публичной документации.
- * Настраивается через config('laravel-data-scramble.strip_prefix').
+ * Настраивается через config('skiexx-data-scramble.strip_prefix').
  */
 class StripRoutePrefixExtension extends OperationExtension
 {
     /** Обрезает префикс из пути операции если настроен strip_prefix. */
     public function handle(Operation $operation, RouteInfo $routeInfo): void
     {
-        $prefix = config('laravel-data-scramble.strip_prefix');
+        $prefix = config('skiexx-data-scramble.strip_prefix');
 
         if ($prefix === null || $prefix === '') {
             return;

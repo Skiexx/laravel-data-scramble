@@ -154,7 +154,7 @@ class DataClassSchemaResolver
                 $propertyType->nullable(true);
             }
 
-            if ($property->computed && config('laravel-data-scramble.computed_as_readonly', true)) {
+            if ($property->computed && config('skiexx-data-scramble.computed_as_readonly', true)) {
                 $propertyType->setAttribute('readOnly', true);
             }
 
@@ -183,7 +183,7 @@ class DataClassSchemaResolver
             return false;
         }
 
-        if ($property->type->lazyType !== null && config('laravel-data-scramble.lazy_as_optional', true)) {
+        if ($property->type->lazyType !== null && config('skiexx-data-scramble.lazy_as_optional', true)) {
             return false;
         }
 
@@ -197,7 +197,7 @@ class DataClassSchemaResolver
     /** Определяет, нужно ли пропустить свойство (hidden). */
     private static function shouldSkipProperty(DataProperty $property): bool
     {
-        if ($property->hidden && config('laravel-data-scramble.skip_hidden', true)) {
+        if ($property->hidden && config('skiexx-data-scramble.skip_hidden', true)) {
             return true;
         }
 

@@ -160,7 +160,7 @@ class DataParametersExtractor implements ParameterExtractor
     /** Определяет, нужно ли пропустить свойство (hidden, computed). */
     private function shouldSkipProperty(DataProperty $property): bool
     {
-        if ($property->hidden && config('laravel-data-scramble.skip_hidden', true)) {
+        if ($property->hidden && config('skiexx-data-scramble.skip_hidden', true)) {
             return true;
         }
 
