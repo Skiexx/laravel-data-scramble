@@ -302,6 +302,59 @@ it('generates response with custom status code 201', function (): void {
 });
 
 // ─────────────────────────────────────────────────────────
+// strip_prefix — обрезка префикса маршрутов
+// ─────────────────────────────────────────────────────────
+
+it('strips route prefix from paths when strip_prefix is configured', function (): void {
+    config()->set('skiexx-data-scramble.strip_prefix', 'web');
+
+    Route::prefix('web')->group(function (): void {
+        Route::get('items', fn (): SimpleData => SimpleData::from(['title' => 'T', 'year' => 2024]));
+        Route::post('items', fn (SimpleData $d): array => []);
+    });
+
+    Route::prefix('internal')->group(function (): void {
+        Route::get('health', fn (): array => ['ok' => true]);
+    });
+
+    $config = Scramble::getGeneratorConfig('default');
+    $config->routes(fn (\Illuminate\Routing\Route $route) => str_starts_with($route->uri, 'web/'));
+
+    $generator = app(Generator::class);
+    $doc = $generator($config);
+
+    $paths = array_keys($doc['paths'] ?? []);
+
+    // web/ обрезан
+    expect($paths)->toContain('/items')
+        ->and($paths)->not->toContain('/web/items')
+        ->and($paths)->not->toContain('web/items');
+
+    // internal не попал
+    expect($paths)->not->toContain('/health')
+        ->and($paths)->not->toContain('/internal/health');
+});
+
+it('does not strip prefix when strip_prefix is null', function (): void {
+    config()->set('skiexx-data-scramble.strip_prefix', null);
+
+    Route::prefix('web')->group(function (): void {
+        Route::get('things', fn (): SimpleData => SimpleData::from(['title' => 'T', 'year' => 2024]));
+    });
+
+    $config = Scramble::getGeneratorConfig('default');
+    $config->routes(fn (\Illuminate\Routing\Route $route) => str_starts_with($route->uri, 'web/'));
+
+    $generator = app(Generator::class);
+    $doc = $generator($config);
+
+    $paths = array_keys($doc['paths'] ?? []);
+
+    // web/ НЕ обрезан (strip_prefix = null), путь сохраняет префикс
+    expect($paths)->toContain('/web/things');
+});
+
+// ─────────────────────────────────────────────────────────
 // Контроллер-фикстура для интеграционных тестов
 // ─────────────────────────────────────────────────────────
 
