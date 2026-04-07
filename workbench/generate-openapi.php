@@ -17,7 +17,6 @@ use Illuminate\Support\Facades\Route;
 use Skiexx\LaravelDataScramble\LaravelDataScrambleServiceProvider;
 use Spatie\LaravelData\LaravelDataServiceProvider;
 
-// Создаём минимальное Laravel-приложение через Testbench
 $testCase = new class ('generate') extends \Orchestra\Testbench\TestCase {
     protected function getPackageProviders($app): array
     {
@@ -31,14 +30,16 @@ $testCase = new class ('generate') extends \Orchestra\Testbench\TestCase {
     protected function getEnvironmentSetUp($app): void
     {
         config()->set('database.default', 'testing');
+        // Включаем strip_prefix для теста
+        config()->set('skiexx-data-scramble.strip_prefix', 'web');
     }
 
     public function generate(): void
     {
         $this->setUp();
 
-        // Регистрируем маршруты
-        Route::prefix('api')->group(function (): void {
+        // web/ — публичные роуты (должны попасть в OpenAPI без префикса web/)
+        Route::prefix('web')->group(function (): void {
             Route::get('users', [\Workbench\App\Http\Controllers\UserController::class, 'index']);
             Route::get('users/{id}', [\Workbench\App\Http\Controllers\UserController::class, 'show']);
             Route::post('users', [\Workbench\App\Http\Controllers\UserController::class, 'store']);
@@ -49,9 +50,15 @@ $testCase = new class ('generate') extends \Orchestra\Testbench\TestCase {
             Route::post('products', fn (\Workbench\App\Data\ProductData $data): \Workbench\App\Data\ProductData => $data);
         });
 
-        // Генерируем OpenAPI
+        // internal/ — НЕ должны попасть в OpenAPI
+        Route::prefix('internal')->group(function (): void {
+            Route::get('health', fn (): array => ['status' => 'ok']);
+            Route::get('metrics', fn (): array => ['uptime' => 123]);
+        });
+
+        // Генерируем OpenAPI — фильтруем только web/
         $config = Scramble::getGeneratorConfig('default');
-        $config->routes(fn (\Illuminate\Routing\Route $route) => str_starts_with($route->uri, 'api'));
+        $config->routes(fn (\Illuminate\Routing\Route $route) => str_starts_with($route->uri, 'web/'));
 
         $generator = app(Generator::class);
         $doc = $generator($config);

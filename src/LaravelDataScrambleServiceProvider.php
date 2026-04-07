@@ -51,7 +51,7 @@ class LaravelDataScrambleServiceProvider extends PackageServiceProvider
                 )
                 ->withOperationTransformers(
                     fn (\Dedoc\Scramble\Configuration\OperationTransformers $transformers) => $transformers
-                        ->prepend(StripRoutePrefixExtension::class)
+                        ->append(StripRoutePrefixExtension::class)
                         ->append(ResponseDataOperationExtension::class)
                 )
                 ->afterOpenApiGenerated(function (OpenApi $openApi): void {
