@@ -1,6 +1,6 @@
 # Laravel Data Scramble
 
-> **[English version](README.en.md)**
+> **[English version](README.en.md)** | **[Demo-проект](https://github.com/Skiexx/laravel-data-scramble-demo)**
 
 Бесплатное расширение для [dedoc/scramble](https://github.com/dedoc/scramble), которое автоматически генерирует OpenAPI-схемы из классов [spatie/laravel-data](https://github.com/spatie/laravel-data).
 

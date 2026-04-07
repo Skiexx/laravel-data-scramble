@@ -1,6 +1,6 @@
 # Laravel Data Scramble
 
-> **[Русская версия](README.md)**
+> **[Русская версия](README.md)** | **[Demo project](https://github.com/Skiexx/laravel-data-scramble-demo)**
 
 A free extension for [dedoc/scramble](https://github.com/dedoc/scramble) that automatically generates OpenAPI schemas from [spatie/laravel-data](https://github.com/spatie/laravel-data) classes.
 
