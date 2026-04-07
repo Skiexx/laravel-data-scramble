@@ -239,14 +239,14 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "`JsonResource`",
+                        "description": "",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/components/schemas/JsonResource"
+                                            "type": "object"
                                         }
                                     },
                                     "required": [
@@ -341,10 +341,6 @@
                     "email"
                 ],
                 "title": "CreateUserData"
-            },
-            "JsonResource": {
-                "type": "string",
-                "title": "JsonResource"
             },
             "UpdateUserData": {
                 "type": "object",
