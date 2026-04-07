@@ -13,6 +13,7 @@ use Dedoc\Scramble\Support\Generator\Types\ObjectType as OpenApiObjectType;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Skiexx\LaravelDataScramble\Extensions\LaravelDataTypeToSchemaExtension;
 use Skiexx\LaravelDataScramble\Extensions\ResponseDataOperationExtension;
+use Skiexx\LaravelDataScramble\Extensions\StripRoutePrefixExtension;
 use Skiexx\LaravelDataScramble\Extractors\DataParametersExtractor;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
@@ -49,7 +50,9 @@ class LaravelDataScrambleServiceProvider extends PackageServiceProvider
                     fn (\Dedoc\Scramble\Configuration\ParametersExtractors $extractors) => $extractors->prepend(DataParametersExtractor::class)
                 )
                 ->withOperationTransformers(
-                    fn (\Dedoc\Scramble\Configuration\OperationTransformers $transformers) => $transformers->append(ResponseDataOperationExtension::class)
+                    fn (\Dedoc\Scramble\Configuration\OperationTransformers $transformers) => $transformers
+                        ->prepend(StripRoutePrefixExtension::class)
+                        ->append(ResponseDataOperationExtension::class)
                 )
                 ->afterOpenApiGenerated(function (OpenApi $openApi): void {
                     $this->removeJsonResourceSchema($openApi);
