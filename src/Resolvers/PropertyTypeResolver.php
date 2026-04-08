@@ -65,7 +65,7 @@ class PropertyTypeResolver
         }
 
         if ($propertyType->kind->isDataCollectable()) {
-            $itemClass = $propertyType->dataCollectableClass;
+            $itemClass = $propertyType->dataClass;
 
             if ($itemClass !== null && class_exists($itemClass)) {
                 $arrayType = new OpenApiArrayType();
