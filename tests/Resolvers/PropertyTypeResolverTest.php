@@ -56,10 +56,11 @@ it('resolves enum with int backing type', function (): void {
         ->and($schema->properties['priority']->enum)->toBe([1, 2, 3]);
 });
 
-it('resolves data collection as array type', function (): void {
+it('resolves data collection as array type with reference items', function (): void {
     $components = new Components();
     $resolver = new DataClassSchemaResolver($components);
     $schema = $resolver->resolve(CollectionData::class);
 
-    expect($schema->properties['items'])->toBeInstanceOf(ArrayType::class);
+    expect($schema->properties['items'])->toBeInstanceOf(ArrayType::class)
+        ->and($schema->properties['items']->items)->toBeInstanceOf(Reference::class);
 });
